@@ -1,6 +1,6 @@
 {
-  "name": "serverless-plugin-typescript",
-  "version": "0.0.0-semantic-release",
+  "name": "serverless-plugin-tsoa",
+  "version": "0.0.1",
   "license": "MIT",
   "main": "dist/src/index.js",
   "files": [
@@ -17,8 +17,7 @@
     "lint": "tslint -c tslint.json 'src/**/*.ts'"
   },
   "repository": {
-    "type": "git",
-    "url": "git+https://github.com/prisma/serverless-plugin-typescript.git"
+    "url": "https://github.com/fnolla/serverless-plugin-tsoa.git"
   },
   "keywords": [
     "serverless",
@@ -36,7 +35,8 @@
     "rimraf": "2.6.3",
     "ts-jest": "24.0.2",
     "tslint": "5.14.0",
-    "typescript": "^3.4.1"
+    "tsoa": "^3.2.1",
+    "typescript": "^3.9.7"
   },
   "dependencies": {
     "fs-extra": "^7.0.1",

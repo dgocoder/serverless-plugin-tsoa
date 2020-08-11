@@ -2,6 +2,10 @@ import * as path from 'path'
 import * as fs from 'fs-extra'
 import * as _ from 'lodash'
 import * as globby from 'globby'
+import {
+  generateRoutes,
+  generateSpec,
+} from 'tsoa'
 
 import * as typescript from './typescript'
 import { watchFiles } from './watchFiles'
@@ -23,23 +27,27 @@ export class TypeScriptPlugin {
 
     this.hooks = {
       'before:run:run': async () => {
+        await this.generateRoutes()
         await this.compileTs()
         await this.copyExtras()
         await this.copyDependencies()
       },
       'before:offline:start': async () => {
+        await this.generateRoutes()
         await this.compileTs()
         await this.copyExtras()
         await this.copyDependencies()
         this.watchAll()
       },
       'before:offline:start:init': async () => {
+        await this.generateRoutes()
         await this.compileTs()
         await this.copyExtras()
         await this.copyDependencies()
         this.watchAll()
       },
       'before:package:createDeploymentArtifacts': async () => {
+        await this.generateRoutes()
         await this.compileTs()
         await this.copyExtras()
         await this.copyDependencies(true)
@@ -48,6 +56,7 @@ export class TypeScriptPlugin {
         await this.cleanup()
       },
       'before:deploy:function:packageFunction': async () => {
+        await this.generateRoutes()
         await this.compileTs()
         await this.copyExtras()
         await this.copyDependencies(true)
@@ -56,6 +65,7 @@ export class TypeScriptPlugin {
         await this.cleanup()
       },
       'before:invoke:local:invoke': async () => {
+        await this.generateRoutes()
         const emitedFiles = await this.compileTs()
         await this.copyExtras()
         await this.copyDependencies()
@@ -272,6 +282,15 @@ export class TypeScriptPlugin {
         }
         throw error
       })
+  }
+  private async generateRoutes(): Promise<void> {
+    this.serverless.cli.log('Generate API Routes...')
+
+    await generateSpec({ entryFile: 'api/App.ts', noImplicitAdditionalProperties: 'throw-on-extras', outputDirectory: 'build', controllerPathGlobs: ['**/*.controller.ts'], specVersion: 3 })
+
+    await generateRoutes({ entryFile: 'api/App.ts', controllerPathGlobs: ['**/*.controller.ts'], noImplicitAdditionalProperties: 'throw-on-extras', routesDir: 'build' })
+
+    this.serverless.cli.log('API Route Generation Complete...')
   }
 }
 

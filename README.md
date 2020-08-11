@@ -1,7 +1,6 @@
-# serverless-plugin-typescript
-[![serverless](http://public.serverless.com/badges/v3.svg)](http://www.serverless.com) [![npm version](https://badge.fury.io/js/serverless-plugin-typescript.svg)](https://badge.fury.io/js/serverless-plugin-typescript) [![Build Status](https://travis-ci.org/prisma/serverless-plugin-typescript.svg?branch=master)](https://travis-ci.org/prisma/serverless-plugin-typescript)
+# serverless-plugin-tsoa
 
-Serverless plugin for zero-config Typescript support
+Serverless plugin for zero-config Typescript support w/tsoa
 
 ## Features
 
@@ -14,16 +13,16 @@ Serverless plugin for zero-config Typescript support
 ## Install
 
 ```sh
-yarn add --dev serverless-plugin-typescript typescript
+yarn add --dev serverless-plugin-tsoa typescript
 # or
-npm install -D serverless-plugin-typescript typescript
+npm install -D serverless-plugin-tsoa typescript
 ```
 
 Add the following plugin to your `serverless.yml`:
 
 ```yaml
 plugins:
-  - serverless-plugin-typescript
+  - serverless-plugin-tsoa
 ```
 
 ## Configure
@@ -95,12 +94,12 @@ The normal Serverless deploy procedure will automatically compile with Typescrip
 The plugin integrates very well with [serverless-offline](https://github.com/dherault/serverless-offline) to
 simulate AWS Lambda and AWS API Gateway locally.
 
-Add the plugins to your `serverless.yml` file and make sure that `serverless-plugin-typescript`
+Add the plugins to your `serverless.yml` file and make sure that `serverless-plugin-tsoa`
 precedes `serverless-offline` as the order is important:
 ```yaml
   plugins:
     ...
-    - serverless-plugin-typescript
+    - serverless-plugin-tsoa
     ...
     - serverless-offline
     ...
@@ -116,7 +115,7 @@ Configure your service the same as mentioned above, but additionally add the `se
 plugin as follows:
 ```yaml
   plugins:
-    - serverless-plugin-typescript
+    - serverless-plugin-tsoa
     - serverless-dynamodb-local
     - serverless-offline
 ```
@@ -165,10 +164,3 @@ module.exports = {
 
 }
 ```
-
-## Help & Community
-
-Join our [Spectrum community](http://spectrum.chat/prisma) if you run into issues or have questions. We love talking to you!
-
-<p align="center"><a href="https://oss.prisma.io"><img src="https://imgur.com/IMU2ERq.png" alt="Prisma" height="170px"></a></p>
-
