@@ -1,15 +1,23 @@
-import * as path from "path";
-import * as fs from "fs-extra";
-import * as _ from "lodash";
-import * as globby from "globby";
-import { generateRoutes, generateSpec } from "tsoa";
+import * as path from 'path';
+import * as fs from 'fs-extra';
+import * as _ from 'lodash';
+import * as globby from 'globby';
+import * as ts from 'typescript';
 
-import * as typescript from "./typescript";
-import { watchFiles } from "./watchFiles";
+import { generateRoutes, generateSpec } from 'tsoa';
 
-const SERVERLESS_FOLDER = ".serverless";
-const BUILD_FOLDER = ".build";
+import * as typescript from './typescript';
+import { watchFiles } from './watchFiles';
+import { ExtendedRoutesConfig, ExtendedSpecConfig } from 'tsoa/dist/cli';
 
+const SERVERLESS_FOLDER = '.serverless';
+const BUILD_FOLDER = '.build';
+const TSOA_CONFIG_FILE = 'tsoa.json';
+const SHARED_CONFIG_PROPERTIES = [
+  'entryFile',
+  'noImplicitAdditionalProperties',
+  'controllerPathGlobs',
+];
 export class TypeScriptPlugin {
   private originalServicePath: string;
   private isWatching: boolean;
@@ -23,46 +31,46 @@ export class TypeScriptPlugin {
     this.options = options;
 
     this.hooks = {
-      "before:run:run": async () => {
-        await this.generateRoutes();
+      'before:run:run': async () => {
+        await this.generateSpecAndRoutes();
         await this.compileTs();
         await this.copyExtras();
         await this.copyDependencies();
       },
-      "before:offline:start": async () => {
-        await this.generateRoutes();
-        await this.compileTs();
-        await this.copyExtras();
-        await this.copyDependencies();
-        this.watchAll();
-      },
-      "before:offline:start:init": async () => {
-        await this.generateRoutes();
+      'before:offline:start': async () => {
+        await this.generateSpecAndRoutes();
         await this.compileTs();
         await this.copyExtras();
         await this.copyDependencies();
         this.watchAll();
       },
-      "before:package:createDeploymentArtifacts": async () => {
-        await this.generateRoutes();
+      'before:offline:start:init': async () => {
+        await this.generateSpecAndRoutes();
+        await this.compileTs();
+        await this.copyExtras();
+        await this.copyDependencies();
+        this.watchAll();
+      },
+      'before:package:createDeploymentArtifacts': async () => {
+        await this.generateSpecAndRoutes();
         await this.compileTs();
         await this.copyExtras();
         await this.copyDependencies(true);
       },
-      "after:package:createDeploymentArtifacts": async () => {
+      'after:package:createDeploymentArtifacts': async () => {
         await this.cleanup();
       },
-      "before:deploy:function:packageFunction": async () => {
-        await this.generateRoutes();
+      'before:deploy:function:packageFunction': async () => {
+        await this.generateSpecAndRoutes();
         await this.compileTs();
         await this.copyExtras();
         await this.copyDependencies(true);
       },
-      "after:deploy:function:packageFunction": async () => {
+      'after:deploy:function:packageFunction': async () => {
         await this.cleanup();
       },
-      "before:invoke:local:invoke": async () => {
-        await this.generateRoutes();
+      'before:invoke:local:invoke': async () => {
+        await this.generateSpecAndRoutes();
         const emitedFiles = await this.compileTs();
         await this.copyExtras();
         await this.copyDependencies();
@@ -75,10 +83,10 @@ export class TypeScriptPlugin {
           });
         }
       },
-      "after:invoke:local:invoke": () => {
+      'after:invoke:local:invoke': () => {
         if (this.options.watch) {
           this.watchFunction();
-          this.serverless.cli.log("Waiting for changes...");
+          this.serverless.cli.log('Waiting for changes...');
         }
       },
     };
@@ -117,7 +125,7 @@ export class TypeScriptPlugin {
       // Add plugin to excluded packages or an empty array if exclude is undefined
       fn.package.exclude = _.uniq([
         ...(fn.package.exclude || []),
-        "node_modules/serverless-plugin-typescript",
+        'node_modules/serverless-plugin-typescript',
       ]);
     }
   }
@@ -131,7 +139,7 @@ export class TypeScriptPlugin {
 
     this.isWatching = true;
     watchFiles(this.rootFileNames, this.originalServicePath, () => {
-      this.serverless.pluginManager.spawn("invoke:local");
+      this.serverless.pluginManager.spawn('invoke:local');
     });
   }
 
@@ -152,7 +160,7 @@ export class TypeScriptPlugin {
 
   async compileTs(): Promise<string[]> {
     this.prepare();
-    this.serverless.cli.log("Compiling with Typescript...");
+    this.serverless.cli.log('Compiling with Typescript...');
 
     if (!this.originalServicePath) {
       // Save original service path and functions
@@ -172,7 +180,7 @@ export class TypeScriptPlugin {
     tsconfig.outDir = BUILD_FOLDER;
 
     const emitedFiles = await typescript.run(this.rootFileNames, tsconfig);
-    this.serverless.cli.log("Typescript compiled.");
+    this.serverless.cli.log('Typescript compiled.');
     return emitedFiles;
   }
 
@@ -208,9 +216,9 @@ export class TypeScriptPlugin {
    * @param isPackaging Provided if serverless is packaging the service for deployment
    */
   async copyDependencies(isPackaging = false) {
-    const outPkgPath = path.resolve(path.join(BUILD_FOLDER, "package.json"));
+    const outPkgPath = path.resolve(path.join(BUILD_FOLDER, 'package.json'));
     const outModulesPath = path.resolve(
-      path.join(BUILD_FOLDER, "node_modules")
+      path.join(BUILD_FOLDER, 'node_modules')
     );
 
     // copy development dependencies during packaging
@@ -220,22 +228,22 @@ export class TypeScriptPlugin {
       }
 
       fs.copySync(
-        path.resolve("node_modules"),
-        path.resolve(path.join(BUILD_FOLDER, "node_modules"))
+        path.resolve('node_modules'),
+        path.resolve(path.join(BUILD_FOLDER, 'node_modules'))
       );
     } else {
       if (!fs.existsSync(outModulesPath)) {
         await this.linkOrCopy(
-          path.resolve("node_modules"),
+          path.resolve('node_modules'),
           outModulesPath,
-          "junction"
+          'junction'
         );
       }
     }
 
     // copy/link package.json
     if (!fs.existsSync(outPkgPath)) {
-      await this.linkOrCopy(path.resolve("package.json"), outPkgPath, "file");
+      await this.linkOrCopy(path.resolve('package.json'), outPkgPath, 'file');
     }
   }
 
@@ -298,40 +306,94 @@ export class TypeScriptPlugin {
     type?: fs.FsSymlinkType
   ): Promise<void> {
     return fs.symlink(srcPath, dstPath, type).catch((error) => {
-      if (error.code === "EPERM" && error.errno === -4048) {
+      if (error.code === 'EPERM' && error.errno === -4048) {
         return fs.copy(srcPath, dstPath);
       }
       throw error;
     });
   }
-  private async generateRoutes(): Promise<void> {
-    this.serverless.cli.log("Generate API Routes...");
+  private async generateSpecAndRoutes(): Promise<void> {
+    this.serverless.cli.log('Generate API Routes...');
 
-    await generateSpec({
-      entryFile: "api/App.ts",
-      noImplicitAdditionalProperties: "throw-on-extras",
-      outputDirectory: "build",
-      controllerPathGlobs: ["**/*.controller.ts"],
+    const { specConfig, routesConfig } = this.getSpecAndRoutesConfig(
+      this.originalServicePath,
+      this.isWatching ? null : this.serverless.cli
+    );
+
+    await generateSpec(specConfig);
+    await generateRoutes(routesConfig);
+
+    this.serverless.cli.log('API Route Generation Complete...');
+  }
+
+  private getSpecAndRoutesConfig(
+    cwd: string | undefined = process.cwd(),
+    logger?: { log: (str: string) => void }
+  ): { specConfig: ExtendedSpecConfig; routesConfig: ExtendedRoutesConfig } {
+    let specConfig: ExtendedSpecConfig = {
+      entryFile: 'api/App.ts',
+      noImplicitAdditionalProperties: 'silently-remove-extras',
+      outputDirectory: 'build',
+      controllerPathGlobs: ['**/*.controller.ts'],
       specVersion: 3,
       securityDefinitions: {
         api_key: {
-          type: "apiKey",
-          name: "x-api-key",
-          in: "header",
-          description: "API Key"
+          type: 'apiKey',
+          name: 'x-api-key',
+          in: 'header',
+          description: 'API Key',
         },
       },
-    });
+    };
+    let routesConfig: ExtendedRoutesConfig = {
+      entryFile: 'api/App.ts',
+      controllerPathGlobs: ['**/*.controller.ts'],
+      noImplicitAdditionalProperties: 'silently-remove-extras',
+      routesDir: 'build',
+      authenticationModule: 'api/middleware/auth.ts',
+    };
 
-    await generateRoutes({
-      entryFile: "api/App.ts",
-      controllerPathGlobs: ["**/*.controller.ts"],
-      noImplicitAdditionalProperties: "throw-on-extras",
-      routesDir: "build",
-      authenticationModule: 'api/middleware/auth.ts'
-    });
+    const configFilePath = path.join(cwd, TSOA_CONFIG_FILE);
 
-    this.serverless.cli.log("API Route Generation Complete...");
+    let logMessage = `No ${TSOA_CONFIG_FILE} config found, using defaults...`;
+
+    if (fs.existsSync(configFilePath)) {
+      const configFileText = fs.readFileSync(configFilePath).toString();
+      const result = ts.parseConfigFileTextToJson(
+        configFilePath,
+        configFileText
+      );
+
+      if (!result.error) {
+        logMessage = `Using local ${TSOA_CONFIG_FILE} config...`;
+
+        const tsoaConfig = result.config;
+
+        if (tsoaConfig) {
+          if (tsoaConfig.spec) {
+            specConfig = { ...specConfig, ...tsoaConfig.spec };
+          }
+          if (tsoaConfig.routes) {
+            routesConfig = { ...routesConfig, ...tsoaConfig.routes };
+          }
+
+          SHARED_CONFIG_PROPERTIES.forEach((sharedKey) => {
+            const sharedValue = tsoaConfig[sharedKey];
+
+            if (sharedValue) {
+              specConfig[sharedKey] = sharedValue;
+              routesConfig[sharedKey] = sharedValue;
+            }
+          });
+        }
+      }
+    }
+
+    if (logger) {
+      logger.log(logMessage);
+    }
+
+    return { specConfig, routesConfig };
   }
 }
 
